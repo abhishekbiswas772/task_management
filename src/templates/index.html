@@ -41,6 +41,12 @@
     </div>
 
     <div class="header-right">
+      <button class="summary-btn" id="summaryBtn">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 11.5h10M3 9V6.5M7 9V3M11 9V5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Summary All
+      </button>
       <button class="export-btn" id="exportBtn">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -201,6 +207,62 @@
             <div class="export-btn-sublabel">XML Spreadsheet format</div>
           </div>
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Summary Modal ──────────────────────────────────────────────── -->
+<div class="modal-overlay" id="summaryModal">
+  <div class="modal modal-md">
+    <div class="modal-header">
+      <h2>Summary All</h2>
+      <button class="modal-close" id="closeSummaryModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="summary-hero">
+        <div>
+          <div class="month-label" id="summaryMonthLabel"></div>
+          <div class="summary-subtitle">Visual summary for the selected board.</div>
+        </div>
+        <button class="btn-primary" id="exportSummaryBtn">Export All Summary</button>
+      </div>
+
+      <div class="summary-overview" id="summaryOverview"></div>
+
+      <div class="summary-chart-grid">
+        <div class="summary-chart-card summary-chart-wide">
+          <div class="summary-chart-header">
+            <h3>Activity Heatmap</h3>
+            <span id="heatmapMeta"></span>
+          </div>
+          <div id="heatmapChart"></div>
+        </div>
+
+        <div class="summary-chart-card">
+          <div class="summary-chart-header">
+            <h3>Column Bar Graph</h3>
+          </div>
+          <div id="barChart"></div>
+        </div>
+
+        <div class="summary-chart-card">
+          <div class="summary-chart-header">
+            <h3>Priority Pie Chart</h3>
+          </div>
+          <div id="pieChart"></div>
+        </div>
+
+        <div class="summary-chart-card summary-chart-wide">
+          <div class="summary-chart-header">
+            <h3>Weekly Trend Line</h3>
+          </div>
+          <div id="lineChart"></div>
+        </div>
       </div>
     </div>
   </div>

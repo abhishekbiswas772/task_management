@@ -51,6 +51,7 @@ async function apiFetch(url, options = {}) {
 
 const api = {
   getTasks:      (m, y)   => apiFetch(`/api/tasks/?month=${m}&year=${y}`),
+  getSummary:    (m, y)   => apiFetch(`/api/export/summary?month=${m}&year=${y}`),
   createTask:    (data)   => apiFetch("/api/tasks/", { method: "POST", body: JSON.stringify(data) }),
   updateTask:    (id, d)  => apiFetch(`/api/tasks/${id}`, { method: "PUT", body: JSON.stringify(d) }),
   deleteTask:    (id)     => apiFetch(`/api/tasks/${id}`, { method: "DELETE" }),
@@ -116,6 +117,151 @@ function toast(msg, type = "default") {
   el.textContent = msg;
   document.getElementById("toast-container").appendChild(el);
   setTimeout(() => el.remove(), 2800);
+}
+
+function summaryExportLabel() {
+  return `Summary-${monthName(state.month)}-${state.year}`;
+}
+
+function polarToCartesian(cx, cy, r, angle) {
+  const radians = (angle - 90) * (Math.PI / 180);
+  return {
+    x: cx + r * Math.cos(radians),
+    y: cy + r * Math.sin(radians),
+  };
+}
+
+function describeArc(cx, cy, r, startAngle, endAngle) {
+  const start = polarToCartesian(cx, cy, r, endAngle);
+  const end = polarToCartesian(cx, cy, r, startAngle);
+  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
+}
+
+function chartEmpty(message) {
+  return `<div class="summary-empty">${esc(message)}</div>`;
+}
+
+function renderHeatmapChart(dailyActivity = []) {
+  if (!dailyActivity.length) return chartEmpty("No activity data available.");
+  const maxCount = Math.max(...dailyActivity.map(item => item.count), 0);
+  const palette = ["#E2E8F0", "#BFDBFE", "#7DD3FC", "#38BDF8", "#0EA5E9", "#0369A1"];
+  const getColor = count => {
+    if (!count) return palette[0];
+    const idx = Math.min(palette.length - 1, Math.ceil((count / maxCount) * (palette.length - 1)));
+    return palette[idx];
+  };
+
+  const cells = dailyActivity.map(item => `
+    <div class="heatmap-cell" style="background:${getColor(item.count)}" title="Day ${item.day}: ${item.count} tasks">
+      ${item.day}
+    </div>
+  `).join("");
+
+  return `
+    <div class="summary-heatmap-grid">${cells}</div>
+    <div class="summary-legend">
+      <span class="summary-legend-item"><span class="summary-legend-swatch" style="background:${palette[0]}"></span>Low</span>
+      <span class="summary-legend-item"><span class="summary-legend-swatch" style="background:${palette[3]}"></span>Medium</span>
+      <span class="summary-legend-item"><span class="summary-legend-swatch" style="background:${palette[5]}"></span>High</span>
+    </div>
+  `;
+}
+
+function renderBarChart(columns = []) {
+  if (!columns.length) return chartEmpty("No column data available.");
+  const width = 520;
+  const height = 220;
+  const padding = { top: 20, right: 20, bottom: 60, left: 36 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const maxValue = Math.max(...columns.map(item => item.count), 1);
+  const barWidth = chartWidth / columns.length * 0.62;
+  const gap = chartWidth / columns.length;
+
+  const bars = columns.map((item, index) => {
+    const x = padding.left + index * gap + (gap - barWidth) / 2;
+    const barHeight = (item.count / maxValue) * chartHeight;
+    const y = padding.top + chartHeight - barHeight;
+    return `
+      <rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="10" fill="#4F46E5"></rect>
+      <text x="${x + barWidth / 2}" y="${y - 8}" text-anchor="middle" font-size="11" fill="#475569">${item.count}</text>
+      <text x="${x + barWidth / 2}" y="${height - 20}" text-anchor="middle" font-size="10" fill="#64748B">${esc(item.name.slice(0, 12))}</text>
+    `;
+  }).join("");
+
+  return `
+    <svg class="summary-svg" viewBox="0 0 ${width} ${height}" aria-label="Column bar graph">
+      <line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${width - padding.right}" y2="${padding.top + chartHeight}" stroke="#CBD5E1" stroke-width="1"/>
+      ${bars}
+    </svg>
+  `;
+}
+
+function renderLineChart(weeklySummary = []) {
+  if (!weeklySummary.length) return chartEmpty("No weekly data available.");
+  const width = 620;
+  const height = 240;
+  const padding = { top: 20, right: 20, bottom: 40, left: 28 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const maxValue = Math.max(...weeklySummary.map(item => item.task_count), 1);
+
+  const points = weeklySummary.map((item, index) => {
+    const x = padding.left + (index * chartWidth) / Math.max(weeklySummary.length - 1, 1);
+    const y = padding.top + chartHeight - (item.task_count / maxValue) * chartHeight;
+    return { ...item, x, y };
+  });
+
+  const polyline = points.map(point => `${point.x},${point.y}`).join(" ");
+  const markers = points.map(point => `
+    <circle cx="${point.x}" cy="${point.y}" r="4.5" fill="#F97316"></circle>
+    <text x="${point.x}" y="${point.y - 10}" text-anchor="middle" font-size="11" fill="#475569">${point.task_count}</text>
+    <text x="${point.x}" y="${height - 12}" text-anchor="middle" font-size="10" fill="#64748B">${esc(point.label)}</text>
+  `).join("");
+
+  return `
+    <svg class="summary-svg" viewBox="0 0 ${width} ${height}" aria-label="Weekly trend line graph">
+      <line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${width - padding.right}" y2="${padding.top + chartHeight}" stroke="#CBD5E1" stroke-width="1"/>
+      <polyline fill="none" stroke="#F97316" stroke-width="3" points="${polyline}"></polyline>
+      ${markers}
+    </svg>
+  `;
+}
+
+function renderPieChart(priorities = []) {
+  if (!priorities.length) return chartEmpty("No priority data available.");
+  const total = priorities.reduce((sum, item) => sum + item.count, 0);
+  if (!total) return chartEmpty("No priority data available.");
+  const colors = { High: "#EF4444", Medium: "#F97316", Low: "#22C55E" };
+  let startAngle = 0;
+  const arcs = priorities.map(item => {
+    const angle = (item.count / total) * 360;
+    const endAngle = startAngle + angle;
+    const path = describeArc(70, 70, 52, startAngle, endAngle);
+    const arc = `<path d="${path}" stroke="${colors[item.name] || "#6366F1"}" stroke-width="22" fill="none" stroke-linecap="round"></path>`;
+    startAngle = endAngle;
+    return arc;
+  }).join("");
+
+  const legend = priorities.map(item => `
+    <div class="summary-pie-legend-item">
+      <span class="summary-legend-swatch" style="background:${colors[item.name] || "#6366F1"}"></span>
+      <span>${esc(item.name)} (${item.count})</span>
+    </div>
+  `).join("");
+
+  return `
+    <div class="summary-pie-wrap">
+      <svg class="summary-svg" viewBox="0 0 140 140" style="max-width:180px" aria-label="Priority pie chart">
+        <circle cx="70" cy="70" r="52" stroke="#E2E8F0" stroke-width="22" fill="none"></circle>
+        ${arcs}
+        <text x="70" y="66" text-anchor="middle" font-size="22" font-weight="800" fill="#0F172A">${total}</text>
+        <text x="70" y="86" text-anchor="middle" font-size="11" fill="#64748B">tasks</text>
+      </svg>
+      <div class="summary-pie-legend">${legend}</div>
+    </div>
+  `;
 }
 
 /* ── Render: Header ─────────────────────────────────────────────── */
@@ -629,6 +775,59 @@ function doExportExcel() {
   closeExport();
 }
 
+async function openSummary() {
+  const monthLabel = `${monthName(state.month)} ${state.year}`;
+  document.getElementById("summaryMonthLabel").textContent = monthLabel;
+  document.getElementById("summaryOverview").innerHTML = `<div class="summary-empty">Loading charts...</div>`;
+  document.getElementById("heatmapMeta").textContent = "";
+  document.getElementById("heatmapChart").innerHTML = "";
+  document.getElementById("barChart").innerHTML = "";
+  document.getElementById("pieChart").innerHTML = "";
+  document.getElementById("lineChart").innerHTML = "";
+  document.getElementById("summaryModal").classList.add("open");
+
+  try {
+    const summary = await api.getSummary(state.month, state.year);
+    renderSummary(summary);
+  } catch (err) {
+    document.getElementById("summaryOverview").innerHTML = `<div class="summary-empty">Failed to load charts.</div>`;
+    toast(err.message, "error");
+  }
+}
+
+function closeSummary() {
+  document.getElementById("summaryModal").classList.remove("open");
+}
+
+function renderSummary(summary) {
+  const monthly = summary.monthly_summary || {};
+  const weekly = summary.weekly_summary || [];
+
+  document.getElementById("summaryMonthLabel").textContent = summary.month_label;
+  document.getElementById("summaryOverview").innerHTML = [
+    { label: "Tasks", value: monthly.task_count || 0 },
+    { label: "Done", value: monthly.completed_count || 0 },
+    { label: "In Progress", value: monthly.in_progress_count || 0 },
+    { label: "High Priority", value: monthly.high_priority_count || 0 },
+    { label: "Overdue", value: monthly.overdue_count || 0 },
+    { label: "Comments", value: monthly.comment_count || 0 },
+    { label: "Top Column", value: monthly.top_column || "No tasks" },
+    { label: "Top Priority", value: monthly.top_priority || "No tasks" },
+  ].map(item => `
+    <div class="summary-pill"><strong>${esc(item.label)}:</strong> ${esc(item.value)}</div>
+  `).join("");
+
+  document.getElementById("heatmapMeta").textContent = monthly.date_span || "";
+  document.getElementById("heatmapChart").innerHTML = renderHeatmapChart(monthly.daily_activity || []);
+  document.getElementById("barChart").innerHTML = renderBarChart(monthly.columns || []);
+  document.getElementById("pieChart").innerHTML = renderPieChart(monthly.priorities || []);
+  document.getElementById("lineChart").innerHTML = renderLineChart(weekly);
+}
+
+function doExportSummary() {
+  window.location.href = `/api/export/summary/txt?month=${state.month}&year=${state.year}&label=${encodeURIComponent(summaryExportLabel())}`;
+}
+
 /* ── Init ───────────────────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", () => {
   /* Month nav */
@@ -643,7 +842,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* Export */
+  document.getElementById("summaryBtn").addEventListener("click", openSummary);
   document.getElementById("exportBtn").addEventListener("click", openExport);
+  document.getElementById("closeSummaryModal").addEventListener("click", closeSummary);
+  document.getElementById("exportSummaryBtn").addEventListener("click", doExportSummary);
   document.getElementById("closeExportModal").addEventListener("click", closeExport);
   document.getElementById("exportCsvBtn").addEventListener("click", doExportCSV);
   document.getElementById("exportExcelBtn").addEventListener("click", doExportExcel);

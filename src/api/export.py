@@ -5,15 +5,25 @@ from __future__ import annotations
 
 import csv
 import io
+from calendar import monthrange
+from collections import Counter
+from datetime import datetime
 
-from flask import Blueprint, request, send_file
-from flask_login import login_required
+from flask import Blueprint, jsonify, request, send_file
+from flask_login import current_user, login_required
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from src.database import get_session
 from src.models.task import Task
 
 export_bp = Blueprint("export", __name__, url_prefix="/api/export")
+
+
+def _require_auth_api() -> None:
+    if not current_user.is_authenticated:
+        return jsonify({"error": "Authentication required"}), 401
+    return None
 
 
 def _xe(s: str) -> str:
@@ -27,6 +37,191 @@ def _xe(s: str) -> str:
     )
 
 
+def _parse_iso_date(value: str | None) -> datetime | None:
+    """Parse ISO-ish timestamps from the database."""
+    if not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is not None:
+            return parsed.astimezone().replace(tzinfo=None)
+        return parsed
+    except ValueError:
+        return None
+
+
+def _fmt_day(value: datetime | None) -> str:
+    if not value:
+        return "N/A"
+    return value.strftime("%b %-d")
+
+
+async def _load_tasks(month: int, year: int) -> list[Task]:
+    async with get_session() as session:
+        result = await session.execute(
+            select(Task)
+            .options(selectinload(Task.comments), selectinload(Task.creator))
+            .where(Task.month == month, Task.year == year)
+            .order_by(Task.created_at.asc())
+        )
+        return result.scalars().all()
+
+
+def _build_summary_payload(tasks: list[Task], month: int, year: int) -> dict:
+    total = len(tasks)
+    total_comments = sum(len(task.comments) for task in tasks)
+    overdue = 0
+    with_due_date = 0
+    daily_counter: Counter[int] = Counter()
+    tag_counter: Counter[str] = Counter()
+    column_counter: Counter[str] = Counter()
+    priority_counter: Counter[str] = Counter()
+    weekly_buckets: list[dict] = []
+    days_in_month = monthrange(year, month)[1]
+
+    for start_day in range(1, days_in_month + 1, 7):
+        end_day = min(start_day + 6, days_in_month)
+        weekly_buckets.append(
+            {
+                "label": f"Week {(start_day - 1) // 7 + 1}",
+                "range": f"{start_day}-{end_day}",
+                "start_day": start_day,
+                "end_day": end_day,
+                "tasks": [],
+            }
+        )
+
+    now = datetime.now()
+    oldest_created: datetime | None = None
+    newest_created: datetime | None = None
+
+    for task in tasks:
+        created_dt = _parse_iso_date(task.created_at)
+        due_dt = _parse_iso_date(task.due_date)
+
+        if created_dt:
+            if oldest_created is None or created_dt < oldest_created:
+                oldest_created = created_dt
+            if newest_created is None or created_dt > newest_created:
+                newest_created = created_dt
+            daily_counter[created_dt.day] += 1
+
+        if due_dt:
+            with_due_date += 1
+            if due_dt < now:
+                overdue += 1
+
+        if task.tags:
+            for tag in (item.strip() for item in task.tags.split(",")):
+                if tag:
+                    tag_counter[tag] += 1
+
+        column_counter[task.column_name] += 1
+        priority_counter[task.priority] += 1
+
+        bucket_idx = min(max((created_dt.day if created_dt else 1) - 1, 0) // 7, len(weekly_buckets) - 1)
+        weekly_buckets[bucket_idx]["tasks"].append(task)
+
+    top_tags = [
+        {"name": tag, "count": count}
+        for tag, count in tag_counter.most_common(5)
+    ]
+    daily_activity = [
+        {"day": day, "count": daily_counter.get(day, 0)}
+        for day in range(1, days_in_month + 1)
+    ]
+
+    weekly_summary = []
+    for bucket in weekly_buckets:
+        bucket_tasks = bucket["tasks"]
+        if bucket["start_day"] > days_in_month:
+            continue
+        weekly_summary.append(
+            {
+                "label": bucket["label"],
+                "range": bucket["range"],
+                "task_count": len(bucket_tasks),
+                "done_count": sum(1 for task in bucket_tasks if task.column_name == "Done Internally"),
+                "high_priority_count": sum(1 for task in bucket_tasks if task.priority == "High"),
+                "comment_count": sum(len(task.comments) for task in bucket_tasks),
+                "top_column": Counter(task.column_name for task in bucket_tasks).most_common(1)[0][0] if bucket_tasks else "No tasks",
+            }
+        )
+
+    return {
+        "month": month,
+        "year": year,
+        "month_label": datetime(year, month, 1).strftime("%B %Y"),
+        "monthly_summary": {
+            "task_count": total,
+            "completed_count": column_counter.get("Done Internally", 0),
+            "in_progress_count": column_counter.get("In Progress", 0),
+            "high_priority_count": priority_counter.get("High", 0),
+            "with_due_date_count": with_due_date,
+            "overdue_count": overdue,
+            "comment_count": total_comments,
+            "top_column": column_counter.most_common(1)[0][0] if column_counter else "No tasks",
+            "top_priority": priority_counter.most_common(1)[0][0] if priority_counter else "No tasks",
+            "date_span": f"{_fmt_day(oldest_created)} - {_fmt_day(newest_created)}" if total else "No tasks",
+            "top_tags": top_tags,
+            "columns": [
+                {"name": name, "count": count}
+                for name, count in column_counter.most_common()
+            ],
+            "priorities": [
+                {"name": name, "count": count}
+                for name, count in priority_counter.most_common()
+            ],
+            "daily_activity": daily_activity,
+        },
+        "weekly_summary": weekly_summary,
+    }
+
+
+def _build_summary_export_text(summary: dict) -> str:
+    monthly = summary["monthly_summary"]
+    weekly = summary["weekly_summary"]
+    lines = [
+        f"Task Summary Export - {summary['month_label']}",
+        "",
+        "Monthly Summary",
+        f"Total tasks: {monthly['task_count']}",
+        f"Completed: {monthly['completed_count']}",
+        f"In progress: {monthly['in_progress_count']}",
+        f"High priority: {monthly['high_priority_count']}",
+        f"With due date: {monthly['with_due_date_count']}",
+        f"Overdue: {monthly['overdue_count']}",
+        f"Comments: {monthly['comment_count']}",
+        f"Top column: {monthly['top_column']}",
+        f"Top priority: {monthly['top_priority']}",
+        f"Activity span: {monthly['date_span']}",
+        "",
+        "Top Tags",
+    ]
+
+    if monthly["top_tags"]:
+        lines.extend(f"- {tag['name']}: {tag['count']}" for tag in monthly["top_tags"])
+    else:
+        lines.append("- No tags")
+
+    lines.extend(["", "Weekly Summary"])
+    if weekly:
+        for item in weekly:
+            lines.append(
+                f"- {item['label']} ({item['range']}): "
+                f"{item['task_count']} tasks, "
+                f"{item['done_count']} done, "
+                f"{item['high_priority_count']} high priority, "
+                f"{item['comment_count']} comments, "
+                f"top column {item['top_column']}"
+            )
+    else:
+        lines.append("- No weekly data")
+
+    return "\n".join(lines)
+
+
 @export_bp.route("/csv")
 @login_required
 async def export_csv():
@@ -34,13 +229,7 @@ async def export_csv():
     year  = request.args.get("year",  type=int, default=2026)
     label = request.args.get("label", "Tasks")
 
-    async with get_session() as session:
-        result = await session.execute(
-            select(Task)
-            .where(Task.month == month, Task.year == year)
-            .order_by(Task.created_at.asc())
-        )
-        tasks = result.scalars().all()
+    tasks = await _load_tasks(month, year)
 
     out = io.StringIO()
     w   = csv.writer(out)
@@ -73,13 +262,7 @@ async def export_excel():
     year  = request.args.get("year",  type=int, default=2026)
     label = request.args.get("label", "Tasks")
 
-    async with get_session() as session:
-        result = await session.execute(
-            select(Task)
-            .where(Task.month == month, Task.year == year)
-            .order_by(Task.created_at.asc())
-        )
-        tasks = result.scalars().all()
+    tasks = await _load_tasks(month, year)
 
     safe = _xe(label[:31])
     xml  = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -135,4 +318,33 @@ async def export_excel():
         mimetype="application/vnd.ms-excel",
         as_attachment=True,
         download_name=f"Tasks-{label}.xls",
+    )
+
+
+@export_bp.route("/summary")
+async def export_summary():
+    auth_error = _require_auth_api()
+    if auth_error:
+        return auth_error
+    month = request.args.get("month", type=int, default=1)
+    year = request.args.get("year", type=int, default=2026)
+    tasks = await _load_tasks(month, year)
+    return jsonify(_build_summary_payload(tasks, month, year))
+
+
+@export_bp.route("/summary/txt")
+@login_required
+async def export_summary_text():
+    month = request.args.get("month", type=int, default=1)
+    year = request.args.get("year", type=int, default=2026)
+    label = request.args.get("label", "Summary")
+    tasks = await _load_tasks(month, year)
+    summary = _build_summary_payload(tasks, month, year)
+    text = _build_summary_export_text(summary)
+
+    return send_file(
+        io.BytesIO(text.encode("utf-8")),
+        mimetype="text/plain",
+        as_attachment=True,
+        download_name=f"{label}.txt",
     )
