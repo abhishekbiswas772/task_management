@@ -27,6 +27,7 @@ const state = {
   year: new Date().getFullYear(),
   columns: [],
   tasks: [],
+  isLoading: false,
   dragTaskId: null,
 };
 
@@ -478,6 +479,15 @@ function renderBoard() {
   attachAddButtons();
 }
 
+function setBoardLoading(isLoading) {
+  state.isLoading = isLoading;
+  const loader = document.getElementById("boardLoader");
+  const board = document.getElementById("board");
+  if (!loader || !board) return;
+  loader.hidden = !isLoading;
+  board.classList.toggle("board-loading", isLoading);
+}
+
 function renderColumn(column) {
   const name = typeof column === "string" ? column : column.name;
   const color = typeof column === "string" ? columnColor(column) : column.color;
@@ -606,6 +616,7 @@ function attachAddButtons() {
 
 /* ── Load data ──────────────────────────────────────────────────── */
 async function loadTasks() {
+  setBoardLoading(true);
   document.getElementById("board").innerHTML = getColumns().map(col => `
     <div class="column" style="--col-color:${columnColor(col.name)}">
       <div class="column-header">
@@ -626,6 +637,8 @@ async function loadTasks() {
     renderBoard();
   } catch (err) {
     toast(`Failed to load tasks: ${err.message}`, "error");
+  } finally {
+    setBoardLoading(false);
   }
 }
 

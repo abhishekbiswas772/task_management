@@ -91,6 +91,18 @@
 
   <!-- ── Board ───────────────────────────────────────────────────── -->
   <div class="board-wrapper">
+    <div class="board-loader" id="boardLoader" aria-live="polite" hidden>
+      <div class="board-loader-orbit">
+        <span class="board-loader-core"></span>
+        <span class="board-loader-ring ring-a"></span>
+        <span class="board-loader-ring ring-b"></span>
+        <span class="board-loader-ring ring-c"></span>
+      </div>
+      <div class="board-loader-copy">
+        <strong>Loading your board</strong>
+        <span>Pulling tasks and rebuilding the flow for this month.</span>
+      </div>
+    </div>
     <div class="board" id="board"></div>
   </div>
 

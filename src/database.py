@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 engine: create_async_engine | None = None
 AsyncSessionLocal: async_sessionmaker | None = None
@@ -40,8 +41,10 @@ def init_engine(database_url: str, echo: bool = False) -> None:
         database_url,
         echo=echo,
         pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=10,
+        # Flask async views may run on different event loops under WSGI.
+        # asyncpg connections are loop-bound, so pooled reuse can trigger
+        # "Future attached to a different loop" errors between requests.
+        poolclass=NullPool,
     )
     AsyncSessionLocal = async_sessionmaker(
         engine,
