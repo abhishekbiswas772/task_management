@@ -1,0 +1,6 @@
+flask>=3.0.0
+flask-smorest
+Flask-Limiter
+redis
+flask-crontab
+Flask-SQLAlchemy

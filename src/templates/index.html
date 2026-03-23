@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskBoard</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Header ──────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-left">
+      <div class="header-brand">
+        <div class="header-brand-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect x="1" y="1" width="6" height="6" rx="1.5" fill="white" opacity=".9"/>
+            <rect x="9" y="1" width="6" height="6" rx="1.5" fill="white" opacity=".6"/>
+            <rect x="1" y="9" width="6" height="6" rx="1.5" fill="white" opacity=".6"/>
+            <rect x="9" y="9" width="6" height="6" rx="1.5" fill="white" opacity=".9"/>
+          </svg>
+        </div>
+        <span class="header-brand-name">TaskBoard</span>
+      </div>
+
+      <div class="month-nav">
+        <button class="nav-btn" id="prevMonth" title="Previous month">
+          <svg width="8" height="13" viewBox="0 0 8 13" fill="none">
+            <path d="M7 1.5L2 6.5L7 11.5" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="month-display">
+          <span class="month-name" id="monthName"></span>
+          <span class="year-display" id="yearDisplay"></span>
+        </div>
+        <button class="nav-btn" id="nextMonth" title="Next month">
+          <svg width="8" height="13" viewBox="0 0 8 13" fill="none">
+            <path d="M1 1.5L6 6.5L1 11.5" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <button class="today-btn" id="todayBtn" style="display:none">Today</button>
+      <span class="task-summary" id="taskSummary">0 tasks</span>
+    </div>
+
+    <div class="header-right">
+      <button class="export-btn" id="exportBtn">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="white" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Export
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Board ───────────────────────────────────────────────────── -->
+  <div class="board-wrapper">
+    <div class="board" id="board"></div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- ── Add Task Modal ─────────────────────────────────────────────── -->
+<div class="modal-overlay" id="addTaskModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add Task</h2>
+      <button class="modal-close" id="cancelAddTask">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="addTaskTitle">Title *</label>
+        <input type="text" id="addTaskTitle" placeholder="Task title…" autocomplete="off" />
+      </div>
+
+      <div class="form-group">
+        <label for="addTaskDesc">Description</label>
+        <textarea id="addTaskDesc" rows="3" placeholder="Optional description…"></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="addColumnSelect">Column</label>
+          <select id="addColumnSelect">
+            <option value="TODO">TODO</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Internal Testing">Internal Testing</option>
+            <option value="Client Deployment UAT">Client Deployment UAT</option>
+            <option value="Client Production">Client Production</option>
+            <option value="Dependency List">Dependency List</option>
+            <option value="Done Internally">Done Internally</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="addTaskPriority">Priority</label>
+          <select id="addTaskPriority">
+            <option value="Low">Low</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Reminder</label>
+        <div class="toggle-row">
+          <span class="toggle-label-text">Set due date</span>
+          <label class="switch">
+            <input type="checkbox" id="addDueDateToggle" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div id="addDueDateRow" style="display:none; margin-top:8px">
+          <input type="datetime-local" id="addDueDate" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="cancelAddTaskFooter">Cancel</button>
+      <button class="btn-primary" id="submitAddTask">Add Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Task Detail Modal ──────────────────────────────────────────── -->
+<div class="modal-overlay" id="taskDetailModal">
+  <div class="modal modal-large">
+    <div class="modal-header">
+      <h2>Task Detail</h2>
+      <button class="modal-close" id="closeDetailModal">✕</button>
+    </div>
+    <div class="modal-body" id="detailContent">
+      <!-- rendered by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ── Export Modal ───────────────────────────────────────────────── -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2>Export Tasks</h2>
+      <button class="modal-close" id="closeExportModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="export-info">
+        <div class="month-label" id="exportMonthLabel"></div>
+        <div class="count-label" id="exportCountLabel"></div>
+      </div>
+
+      <div class="export-options">
+        <button class="export-option-btn primary" id="exportCsvBtn">
+          <div class="export-btn-icon">📊</div>
+          <div>
+            <div class="export-btn-label">Export as CSV</div>
+            <div class="export-btn-sublabel">Excel · Numbers · Google Sheets</div>
+          </div>
+        </button>
+        <button class="export-option-btn secondary" id="exportExcelBtn">
+          <div class="export-btn-icon">📄</div>
+          <div>
+            <div class="export-btn-label">Export as Excel (.xls)</div>
+            <div class="export-btn-sublabel">XML Spreadsheet format</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast container ───────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<script src="/static/js/app.js"></script>
+<script>
+  // Wire the duplicate cancel button in the add-task footer
+  document.getElementById("cancelAddTaskFooter").addEventListener("click", closeAddTask);
+</script>
+</body>
+</html>
