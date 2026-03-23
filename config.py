@@ -2,7 +2,7 @@ import os
 from datetime import timedelta
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH  = os.environ.get("DB_PATH", "/Users/abhishek/Desktop/task_management/backups/tasks.db")
+DB_PATH  = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "tasks.db"))
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 
 
