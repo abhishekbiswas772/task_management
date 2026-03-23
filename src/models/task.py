@@ -9,6 +9,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
+from src.utils.mentions import extract_mentions
 
 
 class Task(Base):
@@ -42,6 +43,7 @@ class Task(Base):
             "id":          self.id,
             "title":       self.title,
             "description": self.description,
+            "mentions":    extract_mentions(self.title, self.description),
             "column_name": self.column_name,
             "month":       self.month,
             "year":        self.year,

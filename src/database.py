@@ -23,6 +23,17 @@ class Base(DeclarativeBase):
     pass
 
 
+DEFAULT_BOARD_COLUMNS = [
+    ("TODO", "#6B7280"),
+    ("In Progress", "#8B5CF6"),
+    ("Internal Testing", "#3B82F6"),
+    ("Client Deployment UAT", "#F97316"),
+    ("Client Production", "#22C55E"),
+    ("Dependency List", "#B45309"),
+    ("Done Internally", "#14B8A6"),
+]
+
+
 def init_engine(database_url: str, echo: bool = False) -> None:
     global engine, AsyncSessionLocal
     engine = create_async_engine(
@@ -78,3 +89,18 @@ async def _migrate_columns(conn) -> None:
             await conn.execute(text(f"ALTER TABLE comments ADD COLUMN {col} {defn}"))
         except Exception:
             pass
+
+    try:
+        count = await conn.scalar(text("SELECT COUNT(*) FROM board_columns"))
+    except Exception:
+        count = None
+
+    if count == 0:
+        for position, (name, color) in enumerate(DEFAULT_BOARD_COLUMNS):
+            await conn.execute(
+                text(
+                    "INSERT INTO board_columns (name, position, color) "
+                    "VALUES (:name, :position, :color)"
+                ),
+                {"name": name, "position": position, "color": color},
+            )

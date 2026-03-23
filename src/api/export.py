@@ -19,8 +19,10 @@ from src.models.task import Task
 
 export_bp = Blueprint("export", __name__, url_prefix="/api/export")
 
+_NO_TASKS = "No tasks"
 
-def _require_auth_api() -> None:
+
+def _require_auth_api():
     if not current_user.is_authenticated:
         return jsonify({"error": "Authentication required"}), 401
     return None
@@ -137,17 +139,21 @@ def _build_summary_payload(tasks: list[Task], month: int, year: int) -> dict:
         bucket_tasks = bucket["tasks"]
         if bucket["start_day"] > days_in_month:
             continue
+        top_col_counter = Counter(task.column_name for task in bucket_tasks).most_common(1)
         weekly_summary.append(
             {
                 "label": bucket["label"],
                 "range": bucket["range"],
                 "task_count": len(bucket_tasks),
-                "done_count": sum(1 for task in bucket_tasks if task.column_name == "Done Internally"),
                 "high_priority_count": sum(1 for task in bucket_tasks if task.priority == "High"),
                 "comment_count": sum(len(task.comments) for task in bucket_tasks),
-                "top_column": Counter(task.column_name for task in bucket_tasks).most_common(1)[0][0] if bucket_tasks else "No tasks",
+                "top_column": top_col_counter[0][0] if top_col_counter else _NO_TASKS,
             }
         )
+
+    top_column = column_counter.most_common(1)[0][0] if column_counter else _NO_TASKS
+    top_priority = priority_counter.most_common(1)[0][0] if priority_counter else _NO_TASKS
+    date_span = f"{_fmt_day(oldest_created)} - {_fmt_day(newest_created)}" if total else _NO_TASKS
 
     return {
         "month": month,
@@ -155,15 +161,13 @@ def _build_summary_payload(tasks: list[Task], month: int, year: int) -> dict:
         "month_label": datetime(year, month, 1).strftime("%B %Y"),
         "monthly_summary": {
             "task_count": total,
-            "completed_count": column_counter.get("Done Internally", 0),
-            "in_progress_count": column_counter.get("In Progress", 0),
             "high_priority_count": priority_counter.get("High", 0),
             "with_due_date_count": with_due_date,
             "overdue_count": overdue,
             "comment_count": total_comments,
-            "top_column": column_counter.most_common(1)[0][0] if column_counter else "No tasks",
-            "top_priority": priority_counter.most_common(1)[0][0] if priority_counter else "No tasks",
-            "date_span": f"{_fmt_day(oldest_created)} - {_fmt_day(newest_created)}" if total else "No tasks",
+            "top_column": top_column,
+            "top_priority": top_priority,
+            "date_span": date_span,
             "top_tags": top_tags,
             "columns": [
                 {"name": name, "count": count}
@@ -187,8 +191,6 @@ def _build_summary_export_text(summary: dict) -> str:
         "",
         "Monthly Summary",
         f"Total tasks: {monthly['task_count']}",
-        f"Completed: {monthly['completed_count']}",
-        f"In progress: {monthly['in_progress_count']}",
         f"High priority: {monthly['high_priority_count']}",
         f"With due date: {monthly['with_due_date_count']}",
         f"Overdue: {monthly['overdue_count']}",
@@ -197,9 +199,15 @@ def _build_summary_export_text(summary: dict) -> str:
         f"Top priority: {monthly['top_priority']}",
         f"Activity span: {monthly['date_span']}",
         "",
-        "Top Tags",
+        "Column Breakdown",
     ]
 
+    if monthly["columns"]:
+        lines.extend(f"- {col['name']}: {col['count']}" for col in monthly["columns"])
+    else:
+        lines.append("- No tasks")
+
+    lines.extend(["", "Top Tags"])
     if monthly["top_tags"]:
         lines.extend(f"- {tag['name']}: {tag['count']}" for tag in monthly["top_tags"])
     else:
@@ -211,10 +219,9 @@ def _build_summary_export_text(summary: dict) -> str:
             lines.append(
                 f"- {item['label']} ({item['range']}): "
                 f"{item['task_count']} tasks, "
-                f"{item['done_count']} done, "
                 f"{item['high_priority_count']} high priority, "
                 f"{item['comment_count']} comments, "
-                f"top column {item['top_column']}"
+                f"top column: {item['top_column']}"
             )
     else:
         lines.append("- No weekly data")
@@ -222,7 +229,7 @@ def _build_summary_export_text(summary: dict) -> str:
     return "\n".join(lines)
 
 
-@export_bp.route("/csv")
+@export_bp.route("/csv", methods=["GET"])
 @login_required
 async def export_csv():
     month = request.args.get("month", type=int, default=1)
@@ -255,7 +262,7 @@ async def export_csv():
     )
 
 
-@export_bp.route("/excel")
+@export_bp.route("/excel", methods=["GET"])
 @login_required
 async def export_excel():
     month = request.args.get("month", type=int, default=1)
@@ -295,7 +302,12 @@ async def export_excel():
     for t in tasks:
         comments = t.comments
         ct       = " | ".join(c.text for c in comments)
-        priority_style = "Hi" if t.priority == "High" else ("Hl" if t.priority == "Low" else "Hm")
+        if t.priority == "High":
+            priority_style = "Hi"
+        elif t.priority == "Low":
+            priority_style = "Hl"
+        else:
+            priority_style = "Hm"
         creator  = _xe(t.creator.username if t.creator else "")
         xml += f"""
       <Row>
@@ -321,7 +333,7 @@ async def export_excel():
     )
 
 
-@export_bp.route("/summary")
+@export_bp.route("/summary", methods=["GET"])
 async def export_summary():
     auth_error = _require_auth_api()
     if auth_error:
@@ -332,7 +344,7 @@ async def export_summary():
     return jsonify(_build_summary_payload(tasks, month, year))
 
 
-@export_bp.route("/summary/txt")
+@export_bp.route("/summary/txt", methods=["GET"])
 @login_required
 async def export_summary_text():
     month = request.args.get("month", type=int, default=1)

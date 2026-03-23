@@ -14,7 +14,7 @@ from config import DB_PATH, config_map
 from src.backup.scheduler import start_scheduler
 from src.database import create_tables, init_engine
 from src.extensions import bcrypt, csrf, login_manager, sess, smorest_api
-from src.models.user import User
+from src.models import BoardColumn, Comment, Task, User
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -90,10 +90,14 @@ def create_app(config_name: str | None = None) -> Flask:
     from src.auth import auth_bp
     app.register_blueprint(auth_bp)
 
-    from src.api.tasks    import blp as tasks_blp
-    from src.api.comments import blp as comments_blp
+    from src.api.tasks         import blp as tasks_blp
+    from src.api.comments      import blp as comments_blp
+    from src.api.board_columns import blp as board_columns_blp
+    from src.api.users         import blp as users_blp
     smorest_api.register_blueprint(tasks_blp)
     smorest_api.register_blueprint(comments_blp)
+    smorest_api.register_blueprint(board_columns_blp)
+    smorest_api.register_blueprint(users_blp)
 
     from src.api.export import export_bp
     app.register_blueprint(export_bp)
@@ -102,6 +106,8 @@ def create_app(config_name: str | None = None) -> Flask:
     # (API routes use session-cookie auth; CSRF token is passed via X-CSRFToken header in JS)
     csrf.exempt(tasks_blp)
     csrf.exempt(comments_blp)
+    csrf.exempt(board_columns_blp)
+    csrf.exempt(users_blp)
     csrf.exempt(export_bp)
 
     # ── Main route ────────────────────────────────────────────────────

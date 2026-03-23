@@ -41,11 +41,17 @@
     </div>
 
     <div class="header-right">
+      <button class="board-btn" id="boardConfigBtn">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M7 1.5v11M1.5 7h11M2.8 2.8l8.4 8.4M11.2 2.8l-8.4 8.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        Board
+      </button>
       <button class="summary-btn" id="summaryBtn">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M2 11.5h10M3 9V6.5M7 9V3M11 9V5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        Summary All
+        Summary
       </button>
       <button class="export-btn" id="exportBtn">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -117,15 +123,7 @@
       <div class="form-row">
         <div class="form-group">
           <label for="addColumnSelect">Column</label>
-          <select id="addColumnSelect">
-            <option value="TODO">TODO</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Internal Testing">Internal Testing</option>
-            <option value="Client Deployment UAT">Client Deployment UAT</option>
-            <option value="Client Production">Client Production</option>
-            <option value="Dependency List">Dependency List</option>
-            <option value="Done Internally">Done Internally</option>
-          </select>
+          <select id="addColumnSelect"></select>
         </div>
         <div class="form-group">
           <label>Priority</label>
@@ -212,11 +210,55 @@
   </div>
 </div>
 
+<!-- ── Board Config Modal ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="boardConfigModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2>Kanban Flow</h2>
+      <button class="modal-close" id="closeBoardConfigModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="summary-subtitle" style="margin-bottom:12px">Add your own columns and rename the kanban flow.</div>
+      <div id="boardColumnsEditor" class="board-columns-editor"></div>
+      <div class="board-add-row">
+        <input type="text" id="newColumnName" placeholder="New column name" autocomplete="off"/>
+        <input type="color" id="newColumnColor" value="#4F46E5"/>
+        <button class="btn-primary" id="addColumnBtn">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirmation Modal ────────────────────────────────────────── -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 id="confirmTitle">Confirm Action</h2>
+      <button class="modal-close" id="closeConfirmModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p class="confirm-copy" id="confirmMessage"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="confirmCancelBtn">Cancel</button>
+      <button class="btn-danger" id="confirmActionBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Summary Modal ──────────────────────────────────────────────── -->
 <div class="modal-overlay" id="summaryModal">
   <div class="modal modal-md">
     <div class="modal-header">
-      <h2>Summary All</h2>
+      <h2>Monthly Summary</h2>
       <button class="modal-close" id="closeSummaryModal">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -262,6 +304,13 @@
             <h3>Weekly Trend Line</h3>
           </div>
           <div id="lineChart"></div>
+        </div>
+
+        <div class="summary-chart-card summary-chart-wide">
+          <div class="summary-chart-header">
+            <h3>Weekly Breakdown</h3>
+          </div>
+          <div id="weeklyTable"></div>
         </div>
       </div>
     </div>

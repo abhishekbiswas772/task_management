@@ -7,6 +7,7 @@ from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
+from src.utils.mentions import extract_mentions
 
 
 class Comment(Base):
@@ -31,6 +32,7 @@ class Comment(Base):
             "id":         self.id,
             "task_id":    self.task_id,
             "text":       self.text,
+            "mentions":   extract_mentions(self.text),
             "created_at": self.created_at,
             "user_id":    self.user_id,
             "username":   self.username or (self.author.username if self.author else ""),
