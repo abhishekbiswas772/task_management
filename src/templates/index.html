@@ -1,12 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TaskBoard</title>
-  <link rel="stylesheet" href="/static/css/style.css" />
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}TaskBoard{% endblock %}
+
+{% block body %}
 <div id="app">
 
   <!-- ── Header ──────────────────────────────────────────────────── -->
@@ -27,8 +22,7 @@
       <div class="month-nav">
         <button class="nav-btn" id="prevMonth" title="Previous month">
           <svg width="8" height="13" viewBox="0 0 8 13" fill="none">
-            <path d="M7 1.5L2 6.5L7 11.5" stroke="currentColor" stroke-width="1.8"
-                  stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 1.5L2 6.5L7 11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
         <div class="month-display">
@@ -37,8 +31,7 @@
         </div>
         <button class="nav-btn" id="nextMonth" title="Next month">
           <svg width="8" height="13" viewBox="0 0 8 13" fill="none">
-            <path d="M1 1.5L6 6.5L1 11.5" stroke="currentColor" stroke-width="1.8"
-                  stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M1 1.5L6 6.5L1 11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
       </div>
@@ -50,11 +43,37 @@
     <div class="header-right">
       <button class="export-btn" id="exportBtn">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="white" stroke-width="1.6"
-                stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         Export
       </button>
+
+      <!-- User menu -->
+      <div class="user-menu" id="userMenu">
+        <button class="user-avatar-btn" id="userAvatarBtn" title="{{ current_user.username }}">
+          <span class="user-avatar">{{ current_user.username[0]|upper }}</span>
+          <span class="user-name">{{ current_user.username }}</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="user-dropdown-header">
+            <div class="user-dropdown-avatar">{{ current_user.username[0]|upper }}</div>
+            <div>
+              <div class="user-dropdown-name">{{ current_user.username }}</div>
+              <div class="user-dropdown-email">{{ current_user.email }}</div>
+            </div>
+          </div>
+          <div class="user-dropdown-divider"></div>
+          <a href="{{ url_for('auth.logout') }}" class="user-dropdown-item danger">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+            Sign Out
+          </a>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -69,20 +88,26 @@
 <div class="modal-overlay" id="addTaskModal">
   <div class="modal">
     <div class="modal-header">
-      <h2>Add Task</h2>
-      <button class="modal-close" id="cancelAddTask">✕</button>
+      <h2>New Task</h2>
+      <button class="modal-close" id="cancelAddTask">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label for="addTaskTitle">Title *</label>
-        <input type="text" id="addTaskTitle" placeholder="Task title…" autocomplete="off" />
+        <label for="addTaskTitle">Title <span class="required">*</span></label>
+        <input type="text" id="addTaskTitle" placeholder="What needs to be done?" autocomplete="off"/>
       </div>
-
       <div class="form-group">
         <label for="addTaskDesc">Description</label>
-        <textarea id="addTaskDesc" rows="3" placeholder="Optional description…"></textarea>
+        <textarea id="addTaskDesc" rows="3" placeholder="Add details, links, or notes…"></textarea>
       </div>
-
+      <div class="form-group">
+        <label for="addTaskTags">Tags</label>
+        <input type="text" id="addTaskTags" placeholder="frontend, api, bug  (comma-separated)" autocomplete="off"/>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label for="addColumnSelect">Column</label>
@@ -97,32 +122,31 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="addTaskPriority">Priority</label>
-          <select id="addTaskPriority">
-            <option value="Low">Low</option>
-            <option value="Medium" selected>Medium</option>
-            <option value="High">High</option>
-          </select>
+          <label>Priority</label>
+          <div class="priority-selector" id="addPrioritySelector">
+            <button class="priority-btn" data-priority="Low">Low</button>
+            <button class="priority-btn active" data-priority="Medium" style="background:#F97316;color:#fff;border-color:#F97316">Medium</button>
+            <button class="priority-btn" data-priority="High">High</button>
+          </div>
         </div>
       </div>
-
       <div class="form-group">
-        <label>Reminder</label>
+        <label>Due Date</label>
         <div class="toggle-row">
-          <span class="toggle-label-text">Set due date</span>
+          <span class="toggle-label-text">Set reminder</span>
           <label class="switch">
-            <input type="checkbox" id="addDueDateToggle" />
+            <input type="checkbox" id="addDueDateToggle"/>
             <span class="slider"></span>
           </label>
         </div>
         <div id="addDueDateRow" style="display:none; margin-top:8px">
-          <input type="datetime-local" id="addDueDate" />
+          <input type="datetime-local" id="addDueDate"/>
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" id="cancelAddTaskFooter">Cancel</button>
-      <button class="btn-primary" id="submitAddTask">Add Task</button>
+      <button class="btn-primary" id="submitAddTask">Create Task</button>
     </div>
   </div>
 </div>
@@ -132,11 +156,13 @@
   <div class="modal modal-large">
     <div class="modal-header">
       <h2>Task Detail</h2>
-      <button class="modal-close" id="closeDetailModal">✕</button>
+      <button class="modal-close" id="closeDetailModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
     </div>
-    <div class="modal-body" id="detailContent">
-      <!-- rendered by JS -->
-    </div>
+    <div class="modal-body" id="detailContent"></div>
   </div>
 </div>
 
@@ -145,13 +171,20 @@
   <div class="modal modal-sm">
     <div class="modal-header">
       <h2>Export Tasks</h2>
-      <button class="modal-close" id="closeExportModal">✕</button>
+      <button class="modal-close" id="closeExportModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
     </div>
     <div class="modal-body">
       <div class="export-info">
         <div class="month-label" id="exportMonthLabel"></div>
         <div class="count-label" id="exportCountLabel"></div>
       </div>
+
+      <!-- column breakdown preview -->
+      <div class="export-breakdown" id="exportBreakdown"></div>
 
       <div class="export-options">
         <button class="export-option-btn primary" id="exportCsvBtn">
@@ -176,10 +209,24 @@
 <!-- ── Toast container ───────────────────────────────────────────── -->
 <div id="toast-container"></div>
 
-<script src="/static/js/app.js"></script>
 <script>
-  // Wire the duplicate cancel button in the add-task footer
-  document.getElementById("cancelAddTaskFooter").addEventListener("click", closeAddTask);
+  // Pass current user to JS
+  window.CURRENT_USER = {
+    username: {{ current_user.username | tojson }},
+    id: {{ current_user.id | tojson }}
+  };
 </script>
-</body>
-</html>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+  document.getElementById("cancelAddTaskFooter").addEventListener("click", closeAddTask);
+
+  // User dropdown
+  const userAvatarBtn = document.getElementById("userAvatarBtn");
+  const userDropdown  = document.getElementById("userDropdown");
+  userAvatarBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    userDropdown.classList.toggle("open");
+  });
+  document.addEventListener("click", () => userDropdown.classList.remove("open"));
+</script>
+{% endblock %}

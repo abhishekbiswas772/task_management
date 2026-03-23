@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Create Account — TaskBoard{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block body %}
+<div class="auth-container">
+
+  <!-- Left panel -->
+  <div class="auth-panel-left">
+    <div class="auth-brand">
+      <div class="auth-brand-icon">
+        <svg width="24" height="24" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="1" width="6" height="6" rx="1.5" fill="white" opacity=".95"/>
+          <rect x="9" y="1" width="6" height="6" rx="1.5" fill="white" opacity=".6"/>
+          <rect x="1" y="9" width="6" height="6" rx="1.5" fill="white" opacity=".6"/>
+          <rect x="9" y="9" width="6" height="6" rx="1.5" fill="white" opacity=".95"/>
+        </svg>
+      </div>
+      <span class="auth-brand-name">TaskBoard</span>
+    </div>
+    <div class="auth-hero">
+      <h1>Get started<br/>in seconds.</h1>
+      <p>Create your free account and start organising tasks across your team. No credit card required.</p>
+    </div>
+    <div class="auth-features">
+      <div class="auth-feature">
+        <span class="feature-dot" style="background:#8B5CF6"></span>
+        Persistent login via Redis sessions
+      </div>
+      <div class="auth-feature">
+        <span class="feature-dot" style="background:#3B82F6"></span>
+        Secure bcrypt password hashing
+      </div>
+      <div class="auth-feature">
+        <span class="feature-dot" style="background:#22C55E"></span>
+        Full async REST API
+      </div>
+      <div class="auth-feature">
+        <span class="feature-dot" style="background:#F97316"></span>
+        OpenAPI / Swagger docs
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="auth-panel-right">
+    <div class="auth-form-box">
+      <div class="auth-form-header">
+        <h2>Create account</h2>
+        <p>Start managing tasks today</p>
+      </div>
+
+      {% if error %}
+        <div class="auth-alert auth-alert-danger">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('auth.register') }}" novalidate id="regForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+        <div class="auth-field">
+          <label for="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            placeholder="johndoe"
+            autocomplete="username"
+            minlength="3"
+            maxlength="80"
+            required
+            autofocus
+          />
+          <span class="field-hint">3–80 characters, letters and numbers</span>
+        </div>
+
+        <div class="auth-field">
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="john@example.com"
+            autocomplete="email"
+            required
+          />
+        </div>
+
+        <div class="auth-field">
+          <label for="password">Password</label>
+          <div class="password-wrap">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Min. 8 characters"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+            <button type="button" class="pw-toggle" data-target="password" tabindex="-1">
+              <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          <div class="pw-strength-bar" id="pwStrengthBar">
+            <div class="pw-strength-fill" id="pwFill"></div>
+          </div>
+        </div>
+
+        <div class="auth-field">
+          <label for="confirm">Confirm Password</label>
+          <div class="password-wrap">
+            <input
+              type="password"
+              id="confirm"
+              name="confirm"
+              placeholder="Repeat password"
+              autocomplete="new-password"
+              required
+            />
+            <button type="button" class="pw-toggle" data-target="confirm" tabindex="-1">
+              <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="auth-submit-btn" id="registerBtn">
+          <span class="btn-text">Create Account</span>
+          <span class="btn-spinner" style="display:none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" class="spin">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+          </span>
+        </button>
+      </form>
+
+      <p class="auth-switch">
+        Already have an account?
+        <a href="{{ url_for('auth.login') }}">Sign in</a>
+      </p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Password toggles
+  document.querySelectorAll(".pw-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const inp = document.getElementById(btn.dataset.target);
+      inp.type = inp.type === "password" ? "text" : "password";
+      btn.classList.toggle("active");
+    });
+  });
+
+  // Strength meter
+  const pwInput = document.getElementById("password");
+  const fill    = document.getElementById("pwFill");
+  pwInput.addEventListener("input", () => {
+    const v = pwInput.value;
+    let score = 0;
+    if (v.length >= 8) score++;
+    if (/[A-Z]/.test(v)) score++;
+    if (/[0-9]/.test(v)) score++;
+    if (/[^A-Za-z0-9]/.test(v)) score++;
+    const pct    = (score / 4) * 100;
+    const colors = ["#EF4444","#F97316","#EAB308","#22C55E"];
+    fill.style.width      = pct + "%";
+    fill.style.background = colors[score - 1] || "#E2E8F0";
+  });
+
+  // Loading state
+  document.getElementById("regForm").addEventListener("submit", () => {
+    const b = document.getElementById("registerBtn");
+    b.querySelector(".btn-text").style.display = "none";
+    b.querySelector(".btn-spinner").style.display = "inline-flex";
+    b.disabled = true;
+  });
+</script>
+{% endblock %}
