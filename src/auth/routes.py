@@ -40,8 +40,8 @@ async def register():
         elif password != confirm:
             error = "Passwords do not match."
         else:
-            async with get_session() as session:
-                existing = await session.execute(
+            async with get_session() as db:
+                existing = await db.execute(
                     select(User).where(
                         (User.username == username) | (User.email == email)
                     )
@@ -56,7 +56,7 @@ async def register():
                         password_hash=pw_hash,
                         created_at=datetime.now(timezone.utc),
                     )
-                    session.add(user)
+                    db.add(user)
 
             if not error:
                 flash("Account created! Please log in.", "success")
@@ -78,8 +78,8 @@ async def login():
         password   = request.form.get("password",   "")
         remember   = bool(request.form.get("remember"))
 
-        async with get_session() as session:
-            result = await session.execute(
+        async with get_session() as db:
+            result = await db.execute(
                 select(User).where(
                     (User.username == identifier) | (User.email == identifier.lower())
                 )

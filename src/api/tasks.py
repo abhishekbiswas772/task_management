@@ -10,6 +10,7 @@ from flask.views import MethodView
 from flask_login import current_user
 from flask_smorest import Blueprint, abort
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from src.api.schemas import TaskCreateSchema, TaskQuerySchema, TaskSchema, TaskUpdateSchema
 from src.database import get_session
@@ -41,6 +42,7 @@ class TaskList(MethodView):
         async with get_session() as session:
             result = await session.execute(
                 select(Task)
+                .options(selectinload(Task.comments), selectinload(Task.creator))
                 .where(Task.month == args["month"], Task.year == args["year"])
                 .order_by(Task.created_at.asc())
             )
@@ -71,9 +73,12 @@ class TaskList(MethodView):
         )
         async with get_session() as session:
             session.add(task)
-            # Re-fetch with relationships
             await session.flush()
-            result = await session.execute(select(Task).where(Task.id == task_id))
+            result = await session.execute(
+                select(Task)
+                .options(selectinload(Task.comments), selectinload(Task.creator))
+                .where(Task.id == task_id)
+            )
             created = result.scalar_one()
             return created.to_dict()
 
@@ -88,7 +93,12 @@ class TaskDetail(MethodView):
         """Get a single task."""
         _require_auth()
         async with get_session() as session:
-            task = await session.get(Task, task_id)
+            result = await session.execute(
+                select(Task)
+                .options(selectinload(Task.comments), selectinload(Task.creator))
+                .where(Task.id == task_id)
+            )
+            task = result.scalar_one_or_none()
         if not task:
             abort(404, message="Task not found.")
         return task.to_dict()
@@ -111,7 +121,11 @@ class TaskDetail(MethodView):
                 task.tags = ",".join(data["tags"])
 
         async with get_session() as session:
-            result = await session.execute(select(Task).where(Task.id == task_id))
+            result = await session.execute(
+                select(Task)
+                .options(selectinload(Task.comments), selectinload(Task.creator))
+                .where(Task.id == task_id)
+            )
             updated = result.scalar_one()
             return updated.to_dict()
 

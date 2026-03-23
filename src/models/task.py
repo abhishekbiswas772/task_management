@@ -28,14 +28,14 @@ class Task(Base):
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
-    comments: Mapped[list] = relationship(
+    comments: Mapped[list["Comment"]] = relationship(
         "Comment",
         back_populates="task",
         cascade="all, delete-orphan",
         order_by="Comment.created_at",
-        lazy="selectin",
+        lazy="raise",
     )
-    creator: Mapped[object] = relationship("User", foreign_keys=[created_by], lazy="selectin")
+    creator: Mapped[object] = relationship("User", foreign_keys=[created_by], lazy="raise")
 
     def to_dict(self) -> dict:
         return {

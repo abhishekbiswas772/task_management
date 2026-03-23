@@ -61,12 +61,21 @@ def create_app(config_name: str | None = None) -> Flask:
             conn.close()
             if not row:
                 return None
-            user           = User.__new__(User)
-            user.id        = row[0]
-            user.username  = row[1]
-            user.email     = row[2]
-            user.is_active = bool(row[3])
-            return user
+
+            class _User:
+                is_anonymous = False
+                def get_id(self):
+                    return str(self.id)
+                @property
+                def is_authenticated(self):
+                    return self.is_active
+
+            u           = _User()
+            u.id        = row[0]
+            u.username  = row[1]
+            u.email     = row[2]
+            u.is_active = bool(row[3])
+            return u
         except Exception:
             return None
 
@@ -89,7 +98,10 @@ def create_app(config_name: str | None = None) -> Flask:
     from src.api.export import export_bp
     app.register_blueprint(export_bp)
 
-    # Exempt export endpoints from CSRF (they're GET-only)
+    # Exempt JSON API and export endpoints from CSRF
+    # (API routes use session-cookie auth; CSRF token is passed via X-CSRFToken header in JS)
+    csrf.exempt(tasks_blp)
+    csrf.exempt(comments_blp)
     csrf.exempt(export_bp)
 
     # ── Main route ────────────────────────────────────────────────────

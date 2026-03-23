@@ -23,8 +23,8 @@ class Comment(Base):
     )
     username:   Mapped[str]        = mapped_column(String(80), default="")
 
-    task:   Mapped[object] = relationship("Task", back_populates="comments")
-    author: Mapped[object] = relationship("User", foreign_keys=[user_id], lazy="selectin")
+    task:   Mapped[object] = relationship("Task", back_populates="comments", lazy="raise")
+    author: Mapped[object] = relationship("User", foreign_keys=[user_id], lazy="raise")
 
     def to_dict(self) -> dict:
         return {
