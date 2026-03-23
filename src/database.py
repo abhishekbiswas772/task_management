@@ -39,7 +39,9 @@ def init_engine(database_url: str, echo: bool = False) -> None:
     engine = create_async_engine(
         database_url,
         echo=echo,
-        connect_args={"check_same_thread": False},
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
     )
     AsyncSessionLocal = async_sessionmaker(
         engine,
@@ -68,7 +70,7 @@ async def create_tables() -> None:
 
 
 async def _migrate_columns(conn) -> None:
-    """Add new columns to existing tables without losing data."""
+    """Add new columns to existing tables without losing data (idempotent)."""
     task_cols = [
         ("created_by", "INTEGER"),
         ("tags",       "TEXT DEFAULT ''"),
@@ -79,16 +81,14 @@ async def _migrate_columns(conn) -> None:
     ]
 
     for col, defn in task_cols:
-        try:
-            await conn.execute(text(f"ALTER TABLE tasks ADD COLUMN {col} {defn}"))
-        except Exception:
-            pass
+        await conn.execute(
+            text(f"ALTER TABLE tasks ADD COLUMN IF NOT EXISTS {col} {defn}")
+        )
 
     for col, defn in comment_cols:
-        try:
-            await conn.execute(text(f"ALTER TABLE comments ADD COLUMN {col} {defn}"))
-        except Exception:
-            pass
+        await conn.execute(
+            text(f"ALTER TABLE comments ADD COLUMN IF NOT EXISTS {col} {defn}")
+        )
 
     try:
         count = await conn.scalar(text("SELECT COUNT(*) FROM board_columns"))

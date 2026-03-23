@@ -1,0 +1,115 @@
+services:
+
+  # ── App ───────────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: taskboard_app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      FLASK_ENV: production
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-taskboard}
+      POSTGRES_USER: ${POSTGRES_USER:-taskboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taskboard}
+      REDIS_URL: redis://redis:6379/0
+      DB_BACKUP_ENABLED: ${DB_BACKUP_ENABLED:-false}
+      PORT: 5000
+    ports:
+      - "${APP_PORT:-5000}:5000"
+    volumes:
+      - app_backups:/app/backups
+      - app_sessions:/app/flask_session
+    networks:
+      - internal
+      - public
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/favicon.ico || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ── Postgres ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: taskboard_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-taskboard}
+      POSTGRES_USER: ${POSTGRES_USER:-taskboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taskboard}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-taskboard} -d ${POSTGRES_DB:-taskboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── pgAdmin ───────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: taskboard_pgadmin
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@taskboard.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - internal
+      - public
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: taskboard_redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  pgadmin_data:
+  redis_data:
+  app_backups:
+  app_sessions:
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+# internal: service-to-service only (no host exposure)
+# public:   services that need a host port (app, pgadmin)
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  public:
+    driver: bridge

@@ -1,0 +1,31 @@
+# Version control
+.git
+.gitignore
+
+# Python artefacts
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+
+# IDE / editor
+.vscode
+.idea
+
+# SQLite leftovers (not used in Docker)
+*.db
+*.db-shm
+*.db-wal
+
+# Runtime data (managed by Docker volumes)
+backups/
+flask_session/
+
+# Secrets and local config
+.env
+*.env.local
+
+# Migrations (run inside container via create_tables)
+migrations/

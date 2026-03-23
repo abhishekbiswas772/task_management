@@ -4,13 +4,13 @@ Application factory.
 from __future__ import annotations
 
 import os
-import sqlite3
 
+import psycopg
 import redis
 from flask import Flask, redirect, render_template, url_for
 from flask_login import login_required
 
-from config import DB_PATH, config_map
+from config import config_map
 from src.backup.scheduler import start_scheduler
 from src.database import create_tables, init_engine
 from src.extensions import bcrypt, csrf, login_manager, sess, smorest_api
@@ -51,14 +51,15 @@ def create_app(config_name: str | None = None) -> Flask:
 
     @login_manager.user_loader
     def load_user(user_id: str) -> User | None:
-        """Sync user loader — uses a direct SQLite connection to avoid event-loop conflicts."""
+        """Sync user loader backed by the sync Postgres connection string."""
         try:
-            conn = sqlite3.connect(DB_PATH)
-            row  = conn.execute(
-                "SELECT id, username, email, is_active FROM users WHERE id=?",
-                (int(user_id),),
-            ).fetchone()
-            conn.close()
+            with psycopg.connect(app.config["SYNC_DATABASE_URI"]) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT id, username, email, is_active FROM users WHERE id=%s",
+                        (int(user_id),),
+                    )
+                    row = cur.fetchone()
             if not row:
                 return None
 
